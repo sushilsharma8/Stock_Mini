@@ -1,80 +1,76 @@
+import streamlit as st
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import plotly.graph_objects as go
 from keras.models import load_model
-import streamlit as st
-import matplotlib.pyplot as plt
-
-model = load_model('C:\\Users\\sushi\\Downloads\\Stock_Mini\\Stock Predictions Model.keras')
-
-st.header('Stock Market Predictor')
-
-stock =st.text_input('Enter Stock Symnbol', 'GOOG')
-start = '2012-01-01'
-end = '2022-12-31'
-
-data = yf.download(stock, start ,end)
-
-st.subheader('Stock Data')
-st.write(data)
-
-data_train = pd.DataFrame(data.Close[0: int(len(data)*0.80)])
-data_test = pd.DataFrame(data.Close[int(len(data)*0.80): len(data)])
-
 from sklearn.preprocessing import MinMaxScaler
-scaler = MinMaxScaler(feature_range=(0,1))
 
-pas_100_days = data_train.tail(100)
-data_test = pd.concat([pas_100_days, data_test], ignore_index=True)
-data_test_scale = scaler.fit_transform(data_test)
+# Dummy hardcoded username and password
+USERNAME = "qwerty"
+PASSWORD = "7410"
 
-st.subheader('Price vs MA50')
-ma_50_days = data.Close.rolling(50).mean()
-fig1 = plt.figure(figsize=(8,6))
-plt.plot(ma_50_days, 'r')
-plt.plot(data.Close, 'g')
-plt.show()
-st.pyplot(fig1)
+st.set_page_config(
+    page_title="Stock Market Predictor App",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.subheader('Price vs MA50 vs MA100')
-ma_100_days = data.Close.rolling(100).mean()
-fig2 = plt.figure(figsize=(8,6))
-plt.plot(ma_50_days, 'r')
-plt.plot(ma_100_days, 'b')
-plt.plot(data.Close, 'g')
-plt.show()
-st.pyplot(fig2)
+def login():
+    st.title("Stock Market Predictor App - Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-st.subheader('Price vs MA100 vs MA200')
-ma_200_days = data.Close.rolling(200).mean()
-fig3 = plt.figure(figsize=(8,6))
-plt.plot(ma_100_days, 'r')
-plt.plot(ma_200_days, 'b')
-plt.plot(data.Close, 'g')
-plt.show()
-st.pyplot(fig3)
+    if st.button("Login"):
+        if username == USERNAME and password == PASSWORD:
+            st.success("Logged in successfully!")
+            main()
+        else:
+            st.error("Invalid username or password")
 
-x = []
-y = []
+def main():
+    st.title("Stock Market Predictor App")
 
-for i in range(100, data_test_scale.shape[0]):
-    x.append(data_test_scale[i-100:i])
-    y.append(data_test_scale[i,0])
+    stock = st.text_input('Enter Stock Symbol', 'GOOG')
+    start = '2012-01-01'
+    end = '2022-12-31'
 
-x,y = np.array(x), np.array(y)
+    data = yf.download(stock, start, end)
 
-predict = model.predict(x)
+    if data.empty:
+        st.warning("No data found for the given stock symbol.")
+    else:
+        st.subheader('Stock Data')
+        st.write(data)
 
-scale = 1/scaler.scale_
+        # Candlestick chart using Plotly
+        fig = go.Figure(data=[go.Candlestick(x=data.index,
+                                             open=data['Open'],
+                                             high=data['High'],
+                                             low=data['Low'],
+                                             close=data['Close'],
+                                             name='Candlesticks')])
+        fig.update_layout(xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig)
 
-predict = predict * scale
-y = y * scale
+        # Additional charts and indicators can be added here
+        # Example: Bollinger Bands
+        st.subheader('Bollinger Bands')
+        bollinger_data = pd.DataFrame(index=data.index)
+        bollinger_data['Middle Band'] = data['Close'].rolling(window=20).mean()
+        bollinger_data['Upper Band'] = bollinger_data['Middle Band'] + 2 * data['Close'].rolling(window=20).std()
+        bollinger_data['Lower Band'] = bollinger_data['Middle Band'] - 2 * data['Close'].rolling(window=20).std()
 
-st.subheader('Original Price vs Predicted Price')
-fig4 = plt.figure(figsize=(8,6))
-plt.plot(predict, 'r', label='Original Price')
-plt.plot(y, 'g', label = 'Predicted Price')
-plt.xlabel('Time')
-plt.ylabel('Price')
-plt.show()
-st.pyplot(fig4)
+        fig_bollinger = go.Figure()
+        fig_bollinger.add_trace(go.Scatter(x=bollinger_data.index, y=bollinger_data['Middle Band'], mode='lines',
+                                           name='Middle Band', line=dict(color='blue')))
+        fig_bollinger.add_trace(go.Scatter(x=bollinger_data.index, y=bollinger_data['Upper Band'], mode='lines',
+                                           name='Upper Band', line=dict(color='red')))
+        fig_bollinger.add_trace(go.Scatter(x=bollinger_data.index, y=bollinger_data['Lower Band'], mode='lines',
+                                           name='Lower Band', line=dict(color='green')))
+        fig_bollinger.update_layout(xaxis_rangeslider_visible=False)
+        st.plotly_chart(fig_bollinger)
+
+if __name__ == "__main__":
+    login()
